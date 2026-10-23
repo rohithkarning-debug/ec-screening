@@ -1,0 +1,23 @@
+# Prometheus scrapes every service (D5). Workers are discovered by DNS, so
+# every replica created with --scale worker=N is scraped automatically.
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: api
+    static_configs: [{targets: ["api:8000"]}]
+  - job_name: llm-gateway
+    static_configs: [{targets: ["llm-gateway:8080"]}]
+  - job_name: verifier
+    static_configs: [{targets: ["verifier:8070"]}]
+  - job_name: worker
+    dns_sd_configs:
+      - names: ["worker"]
+        type: A
+        port: 9100
+        refresh_interval: 10s
+  - job_name: cadvisor
+    static_configs: [{targets: ["cadvisor:8080"]}]
+  - job_name: prometheus
+    static_configs: [{targets: ["localhost:9090"]}]
