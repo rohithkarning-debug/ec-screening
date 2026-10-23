@@ -1,0 +1,179 @@
+# Environmental Clearance Pre-Screening Service
+#   cp .env.example .env && docker compose up --build
+# Scale agent workers:  docker compose up -d --scale worker=3
+# Load test:            docker compose --profile loadtest run --rm locust ...
+#
+# Deployment boundaries (D3) - see docs/architecture.md for the reasoning:
+#   api          stateless edge: validation, quarantine, rate limit, cache. Scales with request rate.
+#   worker       agent runs: CPU for embeddings, long-lived. The one service we scale (A7).
+#   verifier     second agent in its own container: fails and restarts independently of workers.
+#   llm-gateway  single choke point for the provider: breaker state, cost, provider swap by config.
+#   llm-stub     fixed-response provider for load tests (D6).
+#   chroma       vector index: stateful, separate resource profile (memory, disk).
+#   redis        queue, run records, caches, rate-limit counters.
+#   ingest       one-shot pipeline; runs on every `up`, embeds only what changed (idempotent).
+#   prometheus, grafana, jaeger, cadvisor  observability (D5).
+
+x-app: &app
+  build: .
+  image: ecs-app:local
+  env_file: .env
+  restart: unless-stopped
+  networks: [ecs]
+
+x-http-health: &http-health
+  interval: 10s
+  timeout: 5s
+  retries: 12
+  start_period: 20s
+
+services:
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: [redis-data:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    networks: [ecs]
+
+  chroma:
+    <<: *app
+    command: ["chroma", "run", "--host", "0.0.0.0", "--port", "8000", "--path", "/data"]
+    volumes: [chroma-data:/data]
+    user: "0:0"
+    healthcheck:
+      <<: *http-health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v2/heartbeat', timeout=3)"]
+
+  ingest:
+    <<: *app
+    command: ["python", "-m", "ecs.ingestion.ingest", "--corpus", "corpus"]
+    restart: "no"
+    volumes: ["./corpus:/app/corpus:ro"]
+    depends_on:
+      redis: {condition: service_healthy}
+      chroma: {condition: service_healthy}
+
+  llm-stub:
+    <<: *app
+    command: ["uvicorn", "ecs.llm.stub:app", "--host", "0.0.0.0", "--port", "8090"]
+    healthcheck:
+      <<: *http-health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health', timeout=3)"]
+
+  llm-gateway:
+    <<: *app
+    command: ["uvicorn", "ecs.llm.gateway:app", "--host", "0.0.0.0", "--port", "8080"]
+    depends_on:
+      llm-stub: {condition: service_healthy}
+    healthcheck:
+      <<: *http-health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=3)"]
+
+  verifier:
+    <<: *app
+    command: ["uvicorn", "ecs.verifier_service:app", "--host", "0.0.0.0", "--port", "8070"]
+    depends_on:
+      chroma: {condition: service_healthy}
+      llm-gateway: {condition: service_healthy}
+    healthcheck:
+      <<: *http-health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8070/health', timeout=3)"]
+
+  worker:
+    <<: *app
+    command: ["python", "-m", "ecs.worker"]
+    depends_on:
+      redis: {condition: service_healthy}
+      ingest: {condition: service_completed_successfully}
+      verifier: {condition: service_healthy}
+      llm-gateway: {condition: service_healthy}
+    healthcheck:
+      <<: *http-health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9100/metrics', timeout=3)"]
+
+  api:
+    <<: *app
+    command: ["uvicorn", "ecs.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports: ["${API_PORT:-8000}:8000"]
+    depends_on:
+      redis: {condition: service_healthy}
+      ingest: {condition: service_completed_successfully}
+    healthcheck:
+      <<: *http-health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+
+  locust:
+    <<: *app
+    profiles: ["loadtest"]
+    restart: "no"
+    entrypoint: ["locust"]
+    volumes: ["./loadtest:/app/loadtest"]
+    ports: ["${LOCUST_PORT:-8089}:8089"]
+    depends_on:
+      api: {condition: service_healthy}
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=7d"]
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports: ["${PROMETHEUS_PORT:-9090}:9090"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks: [ecs]
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    env_file: .env
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/ecs.json
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports: ["${GRAFANA_PORT:-3000}:3000"]
+    depends_on:
+      prometheus: {condition: service_healthy}
+    restart: unless-stopped
+    networks: [ecs]
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports: ["${JAEGER_UI_PORT:-16686}:16686"]
+    restart: unless-stopped
+    networks: [ecs]
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    privileged: true
+    devices: ["/dev/kmsg"]
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    restart: unless-stopped
+    networks: [ecs]
+
+networks:
+  ecs: {}
+
+volumes:
+  redis-data: {}
+  chroma-data: {}
+  prometheus-data: {}
+  grafana-data: {}
