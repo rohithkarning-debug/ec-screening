@@ -1,0 +1,19 @@
+# secrets and local config (D4)
+.env
+.env.*
+!.env.example
+
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# generated output
+eval/results/
+loadtest/results/
+*.log
+
+# corpus PDFs are downloaded per README, not committed (large, public)
+corpus/raw/*.pdf

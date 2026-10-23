@@ -1,0 +1,18 @@
+# Runtime dependencies (one image for every application service).
+langgraph==1.2.16
+langchain-core==1.7.0
+langchain-chroma==1.1.0
+chromadb==1.5.9
+onnxruntime==1.29.0
+fastapi==0.161.1
+uvicorn==0.54.0
+httpx==0.28.1
+pydantic==2.13.5
+redis==8.1.0
+prometheus-client==0.26.0
+opentelemetry-sdk==1.45.1
+opentelemetry-exporter-otlp-proto-grpc==1.45.1
+opentelemetry-instrumentation-fastapi==0.66b1
+PyYAML==6.0.3
+pypdf==5.9.0
+locust==2.47.0

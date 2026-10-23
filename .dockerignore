@@ -1,0 +1,11 @@
+.git
+.env
+**/__pycache__
+**/*.pyc
+.pytest_cache
+eval/results
+loadtest/results
+tests
+docs
+*.md
+!corpus/README.md
