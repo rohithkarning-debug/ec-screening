@@ -1,0 +1,226 @@
+{
+  "$defs": {
+    "Capacity": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "description": "Production or built-up capacity",
+          "exclusiveMinimum": 0,
+          "maximum": 1000000,
+          "title": "Value",
+          "type": "number"
+        },
+        "unit": {
+          "$ref": "#/$defs/CapacityUnit"
+        }
+      },
+      "required": [
+        "value",
+        "unit"
+      ],
+      "title": "Capacity",
+      "type": "object"
+    },
+    "CapacityUnit": {
+      "enum": [
+        "MTPA",
+        "MW",
+        "SQM",
+        "TPA"
+      ],
+      "title": "CapacityUnit",
+      "type": "string"
+    },
+    "Location": {
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/State"
+        },
+        "district": {
+          "maxLength": 100,
+          "minLength": 2,
+          "title": "District",
+          "type": "string"
+        }
+      },
+      "required": [
+        "state",
+        "district"
+      ],
+      "title": "Location",
+      "type": "object"
+    },
+    "Sector": {
+      "enum": [
+        "mining_minerals",
+        "thermal_power",
+        "cement",
+        "petroleum_refining",
+        "building_construction",
+        "township",
+        "other"
+      ],
+      "title": "Sector",
+      "type": "string"
+    },
+    "State": {
+      "enum": [
+        "Andhra Pradesh",
+        "Arunachal Pradesh",
+        "Assam",
+        "Bihar",
+        "Chhattisgarh",
+        "Goa",
+        "Gujarat",
+        "Haryana",
+        "Himachal Pradesh",
+        "Jharkhand",
+        "Karnataka",
+        "Kerala",
+        "Madhya Pradesh",
+        "Maharashtra",
+        "Manipur",
+        "Meghalaya",
+        "Mizoram",
+        "Nagaland",
+        "Odisha",
+        "Punjab",
+        "Rajasthan",
+        "Sikkim",
+        "Tamil Nadu",
+        "Telangana",
+        "Tripura",
+        "Uttar Pradesh",
+        "Uttarakhand",
+        "West Bengal",
+        "Andaman and Nicobar Islands",
+        "Chandigarh",
+        "Dadra and Nagar Haveli and Daman and Diu",
+        "Delhi",
+        "Jammu and Kashmir",
+        "Ladakh",
+        "Lakshadweep",
+        "Puducherry"
+      ],
+      "title": "State",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A project description submitted for screening.",
+  "properties": {
+    "project_name": {
+      "maxLength": 200,
+      "minLength": 3,
+      "title": "Project Name",
+      "type": "string"
+    },
+    "sector": {
+      "$ref": "#/$defs/Sector"
+    },
+    "description": {
+      "description": "Free text. Checked for prompt injection and toxicity.",
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Description",
+      "type": "string"
+    },
+    "capacity": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Capacity"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "area_ha": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "maximum": 100000,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Project or lease area, hectares",
+      "title": "Area Ha"
+    },
+    "location": {
+      "$ref": "#/$defs/Location"
+    },
+    "protected_area_distance_km": {
+      "anyOf": [
+        {
+          "maximum": 500,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Distance to the nearest protected area boundary. null = unknown (escalates).",
+      "title": "Protected Area Distance Km"
+    },
+    "protected_area_name": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "minLength": 2,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Protected Area Name"
+    },
+    "interstate_boundary_distance_km": {
+      "anyOf": [
+        {
+          "maximum": 2000,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Interstate Boundary Distance Km"
+    },
+    "callback_url": {
+      "anyOf": [
+        {
+          "maxLength": 500,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Reserved; clients poll.",
+      "title": "Callback Url"
+    }
+  },
+  "required": [
+    "project_name",
+    "sector",
+    "description",
+    "location",
+    "protected_area_distance_km"
+  ],
+  "title": "ScreeningRequest",
+  "type": "object",
+  "$id": "screening_request.schema.json",
+  "x-contract-version": "1.0.0"
+}
