@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EC Pre-Screening</title>
+<!-- A8: simple web client. Submits a request, polls for the result, shows the
+     recommendation with citations and the escalation path, and takes feedback. -->
+<style>
+  :root { --ink:#1d1d1f; --muted:#5f6368; --line:#d8d8d8; --bg:#fafafa; --card:#fff;
+          --a:#b3261e; --b:#1a5fb4; --none:#2e7d32; --esc:#8a5a00; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink:#eee; --muted:#aaa; --line:#444; --bg:#161616; --card:#202020; }
+  }
+  * { box-sizing:border-box; }
+  body { font:15px/1.5 system-ui, sans-serif; color:var(--ink); background:var(--bg); margin:0; padding:16px; }
+  main { max-width:860px; margin:0 auto; }
+  h1 { font-size:22px; margin:8px 0 4px; }
+  .note { color:var(--muted); font-size:13px; margin:0 0 16px; }
+  form, .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; margin-bottom:16px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; }
+  label { display:block; font-size:13px; color:var(--muted); }
+  input, select, textarea { width:100%; padding:8px; font:inherit; color:var(--ink); background:var(--bg);
+                            border:1px solid var(--line); border-radius:6px; margin-top:2px; }
+  textarea { min-height:70px; }
+  button { padding:9px 16px; font:inherit; border-radius:6px; border:1px solid var(--line); background:var(--ink);
+           color:var(--bg); cursor:pointer; margin-top:12px; }
+  button.secondary { background:transparent; color:var(--ink); }
+  .route { font-size:20px; font-weight:600; }
+  .A { color:var(--a); } .B { color:var(--b); } .none { color:var(--none); } .esc { color:var(--esc); }
+  .cite { border-left:3px solid var(--line); padding:6px 10px; margin:8px 0; font-size:13px; white-space:pre-wrap; }
+  .cite b { font-size:12px; }
+  .err { color:var(--a); white-space:pre-wrap; font-size:13px; }
+  .muted { color:var(--muted); font-size:13px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Environmental Clearance Pre-Screening</h1>
+  <p class="note">Screening opinion under the EIA Notification, 2006. Not an authoritative determination; an accredited consultant decides.</p>
+
+  <form id="f">
+    <div class="grid">
+      <label>Project name<input name="project_name" required value="Example cement grinding unit"></label>
+      <label>Sector
+        <select name="sector">
+          <option value="cement">Cement plant</option>
+          <option value="thermal_power">Thermal power plant</option>
+          <option value="mining_minerals">Mining of minerals</option>
+          <option value="petroleum_refining">Petroleum refining</option>
+          <option value="building_construction">Building construction</option>
+          <option value="township">Township / area development</option>
+          <option value="other">Other</option>
+        </select></label>
+      <label>Capacity<input name="capacity_value" type="number" step="any" value="0.5"></label>
+      <label>Capacity unit
+        <select name="capacity_unit"><option>MTPA</option><option>MW</option><option>SQM</option><option>TPA</option><option value="">(none)</option></select></label>
+      <label>Area (ha)<input name="area_ha" type="number" step="any"></label>
+      <label>State<input name="state" value="Karnataka"></label>
+      <label>District<input name="district" value="Kalaburagi"></label>
+      <label>Distance to protected area (km, blank = unknown)<input name="pa_km" type="number" step="any" value="2"></label>
+      <label>Protected area name<input name="pa_name" value="Example National Park"></label>
+      <label>Distance to inter-state boundary (km)<input name="is_km" type="number" step="any"></label>
+    </div>
+    <label style="margin-top:12px">Description<textarea name="description">Standalone cement grinding unit.</textarea></label>
+    <button type="submit">Screen project</button>
+  </form>
+
+  <div id="out"></div>
+</main>
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const num = (v) => v === "" || v == null ? null : Number(v);
+const ROUTES = {
+  category_a_central: ["Category A: central ministry (MoEFCC)", "A"],
+  category_b_state: ["Category B: state authority (SEIAA)", "B"],
+  no_clearance_required: ["No prior environmental clearance required", "none"],
+  escalate_to_human: ["Escalated to a human reviewer", "esc"],
+};
+
+function body(fd) {
+  const b = {
+    project_name: fd.get("project_name"), sector: fd.get("sector"), description: fd.get("description"),
+    location: { state: fd.get("state"), district: fd.get("district") },
+    protected_area_distance_km: num(fd.get("pa_km")),
+  };
+  if (b.protected_area_distance_km !== null) b.protected_area_name = fd.get("pa_name");
+  if (fd.get("capacity_value") && fd.get("capacity_unit")) b.capacity = { value: num(fd.get("capacity_value")), unit: fd.get("capacity_unit") };
+  if (fd.get("area_ha")) b.area_ha = num(fd.get("area_ha"));
+  if (fd.get("is_km")) b.interstate_boundary_distance_km = num(fd.get("is_km"));
+  return b;
+}
+
+$("#f").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const out = $("#out");
+  out.innerHTML = '<div class="card muted">Submitting…</div>';
+  const r = await fetch("/v1/screenings", { method: "POST", headers: { "Content-Type": "application/json" },
+                                            body: JSON.stringify(body(new FormData(e.target))) });
+  const d = await r.json();
+  if (r.status !== 200 && r.status !== 202) {
+    const errs = (d.errors || []).map((x) => `${x.field}: ${x.error}`).join("\n");
+    out.innerHTML = `<div class="card"><div class="route esc">Request rejected (${r.status}: ${esc(d.error || "")})</div>
+      <div class="err">${esc(errs || JSON.stringify(d.detail || d))}</div>
+      <p class="muted">No screening run was started. Quarantine ID: ${esc(d.quarantine_id || "-")}</p></div>`;
+    return;
+  }
+  if (r.status === 200) return render(d);
+  poll(d.run_id, 0);
+});
+
+async function poll(id, n) {
+  const d = await (await fetch(`/v1/screenings/${id}`)).json();
+  if (d.status === "done" || d.status === "failed") return render(d);
+  $("#out").innerHTML = `<div class="card muted">Run ${esc(id)}: ${esc(d.status)} (${n}s). The agents are retrieving and verifying provisions…</div>`;
+  setTimeout(() => poll(id, n + 1), 1000);
+}
+
+function render(d) {
+  const [label, cls] = ROUTES[d.route] || ["Unknown", "esc"];
+  const cites = (d.citations || []).map((c) => `<div class="cite"><b>${esc(c.clause_id || c.passage_id)}${c.page ? " · page " + esc(c.page) : ""} · ${esc(c.document || "")}</b>\n${esc(c.text)}</div>`).join("");
+  const escalation = d.route === "escalate_to_human"
+    ? `<p><b>Why escalated:</b> ${esc(d.escalation_reason)}</p><p class="muted">Next step: refer the project to an accredited EIA consultant or the relevant authority for a manual screening.</p>` : "";
+  $("#out").innerHTML = `<div class="card">
+    <div class="route ${cls}">${esc(label)}</div>
+    <p class="muted">Run ${esc(d.run_id)} · verified: ${esc(d.verified)} · prompt ${esc(d.prompt_version)}${d.cache_hit ? " · served from cache" : ""}</p>
+    ${d.basis ? `<p>${esc(d.basis)}</p>` : ""}
+    ${escalation}
+    ${(d.conditions_applied || []).length ? `<p><b>Conditions applied:</b> ${esc(d.conditions_applied.join(", "))}</p>` : ""}
+    <h3 style="font-size:15px">${d.route === "escalate_to_human" ? "Provisions consulted" : "Citations"}</h3>
+    ${cites || '<p class="muted">None.</p>'}
+    <p class="muted">${esc(d.disclaimer || "")}</p>
+    <div class="row"><a href="/v1/screenings/${esc(d.run_id)}/trace" target="_blank">Full trace</a></div>
+    <div class="row">
+      <input id="fbr" placeholder="Feedback reason" style="flex:1; min-width:200px">
+      <button class="secondary" onclick="fb('${esc(d.run_id)}', true)">Satisfactory</button>
+      <button class="secondary" onclick="fb('${esc(d.run_id)}', false)">Not satisfactory</button>
+    </div><div id="fbo" class="muted"></div></div>`;
+}
+
+async function fb(id, ok) {
+  const reason = $("#fbr").value || (ok ? "looks right" : "looks wrong");
+  const r = await fetch(`/v1/screenings/${id}/feedback`, { method: "POST", headers: { "Content-Type": "application/json" },
+                                                           body: JSON.stringify({ satisfactory: ok, reason }) });
+  $("#fbo").textContent = r.ok ? "Thanks - feedback recorded." : "Could not record feedback.";
+}
+</script>
+</body>
+</html>
