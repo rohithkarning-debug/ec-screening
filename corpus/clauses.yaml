@@ -1,0 +1,77 @@
+# Verified clauses (Stage 1: the passages section 4.1 depends on).
+#
+# The Schedule is a table; PDF text extraction scrambles tables. So each
+# Schedule row we rely on, and the General Condition, is copied here VERBATIM
+# from the PDF, with its page number. One clause = one chunk in the index.
+#
+# Rules:
+# - Copy the text exactly from your downloaded PDF. Do not paraphrase.
+# - Entries whose text still contains "PASTE" are skipped by ingestion.
+# - clause_id must match ecs/contract.py SECTOR_SCHEDULE_ITEM (e.g. "3(b)").
+#   If the PDF uses a different item number, fix BOTH places.
+# - The General Condition must keep clause_id "GC" and type "modifier".
+# - If an amendment changed a clause, paste the CURRENT wording and name the
+#   amending notification in `amended_by`.
+# A sector with no row here is "outside the corpus" and escalates (F7).
+
+- clause_id: "3(b)"
+  type: schedule_row
+  sector: cement
+  doc_id: eia-2006
+  doc_title: "EIA Notification, 2006 - Schedule"
+  page:
+  amended_by:
+  text: "PASTE EXACT TEXT of Schedule item 3(b) (cement plants), including the Category A and Category B columns"
+
+- clause_id: "1(d)"
+  type: schedule_row
+  sector: thermal_power
+  doc_id: eia-2006
+  doc_title: "EIA Notification, 2006 - Schedule"
+  page:
+  amended_by:
+  text: "PASTE EXACT TEXT of Schedule item 1(d) (thermal power plants)"
+
+- clause_id: "1(a)"
+  type: schedule_row
+  sector: mining_minerals
+  doc_id: eia-2006
+  doc_title: "EIA Notification, 2006 - Schedule"
+  page:
+  amended_by:
+  text: "PASTE EXACT TEXT of Schedule item 1(a) (mining of minerals)"
+
+- clause_id: "4(a)"
+  type: schedule_row
+  sector: petroleum_refining
+  doc_id: eia-2006
+  doc_title: "EIA Notification, 2006 - Schedule"
+  page:
+  amended_by:
+  text: "PASTE EXACT TEXT of Schedule item 4(a) (petroleum refining)"
+
+- clause_id: "8(a)"
+  type: schedule_row
+  sector: building_construction
+  doc_id: eia-2006
+  doc_title: "EIA Notification, 2006 - Schedule"
+  page:
+  amended_by:
+  text: "PASTE EXACT TEXT of Schedule item 8(a) (building and construction projects)"
+
+- clause_id: "8(b)"
+  type: schedule_row
+  sector: township
+  doc_id: eia-2006
+  doc_title: "EIA Notification, 2006 - Schedule"
+  page:
+  amended_by:
+  text: "PASTE EXACT TEXT of Schedule item 8(b) (townships and area development)"
+
+- clause_id: "GC"
+  type: modifier
+  doc_id: eia-2006
+  doc_title: "EIA Notification, 2006 - General Condition"
+  page:
+  amended_by:
+  text: "PASTE EXACT TEXT of the General Condition printed after the Schedule (current wording)"

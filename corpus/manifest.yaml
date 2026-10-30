@@ -1,0 +1,24 @@
+# Corpus manifest (Stage 1: corpus confirmation).
+# One entry per PDF placed in corpus/raw/. Download from the MoEFCC website or
+# the PARIVESH portal. Record what you indexed and why; the ingestion pipeline
+# records a hash of each file so the index shows exactly which versions it holds.
+#
+# text_layer: yes = selectable text; no = scanned, needs OCR before indexing
+# (ingestion skips files without a text layer and logs a warning).
+documents:
+  - doc_id: eia-2006
+    title: "EIA Notification, 2006"
+    so_number: "S.O. 1533(E)"
+    date: 2006-09-14
+    file: eia_notification_2006.pdf       # save the PDF under corpus/raw/ with this name
+    url: ""                               # paste the URL you downloaded it from
+    text_layer: ""                        # yes / no
+    covers: "Base notification, Schedule, General Condition"
+  # - doc_id: amend-YYYY-MM-DD
+  #   title: "Amendment to EIA Notification"
+  #   so_number: "S.O. ____(E)"
+  #   date: YYYY-MM-DD
+  #   file: amend_YYYY_MM_DD.pdf
+  #   url: ""
+  #   text_layer: ""
+  #   covers: "What it changes (e.g. General Condition, item 1(a))"
