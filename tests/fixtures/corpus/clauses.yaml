@@ -1,0 +1,34 @@
+# SYNTHETIC TEST FIXTURE - invented wording, NOT the text of the EIA Notification, 2006.
+# It only mimics the structure (Schedule rows + a separate location-based modifier)
+# so the pipeline can be tested without the real corpus.
+- clause_id: "3(b)"
+  type: schedule_row
+  doc_id: synthetic-fixture
+  doc_title: Synthetic fixture
+  page: 1
+  sector: cement
+  text: >
+    SYNTHETIC ROW 3(b) Cement plants. Category A: production capacity of 1.0 million tonnes
+    per annum or more. Category B: production capacity below 1.0 million tonnes per annum.
+- clause_id: "1(d)"
+  type: schedule_row
+  doc_id: synthetic-fixture
+  doc_title: Synthetic fixture
+  page: 1
+  sector: thermal_power
+  text: >
+    SYNTHETIC ROW 1(d) Thermal power plants. Category A: 500 MW or more. Category B: below 500 MW.
+- clause_id: "GC"
+  type: modifier
+  doc_id: synthetic-fixture
+  doc_title: Synthetic fixture
+  page: 2
+  text: >
+    SYNTHETIC GENERAL CONDITION. Any project in Category B shall be treated as Category A if
+    located in whole or in part within 10 km from the boundary of a protected area, a critically
+    polluted area, a notified eco-sensitive area, or an inter-state or international boundary.
+- clause_id: "8(a)"
+  type: schedule_row
+  doc_id: synthetic-fixture
+  page: 3
+  text: "PASTE EXACT TEXT HERE - placeholder rows are skipped by ingestion"
