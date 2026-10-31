@@ -54,7 +54,8 @@ missing or have no text layer (ingest logs say which).
 | Symptom | Check | Fix |
 | --- | --- | --- |
 | Runs stay `queued` | `ecs_queue_depth` rising; `docker compose ps worker` | `docker compose up -d --scale worker=3`; check worker logs |
-| Runs stuck `running` | Worker restarted mid-run (trace has partial steps) | Resubmit; the stuck record expires after `RUN_TTL_SECONDS` |
+| Runs stuck `running` | Console → System → Agent workers; `ecs_runs_reaped_total` | The reaper closes them as escalations after `STUCK_RUN_SECONDS` (default 195 s). Resubmit the project. If it keeps happening, check `docker compose logs worker` for crashes. |
+| No workers listed in the console's System tab | `docker compose ps worker` | `docker compose up -d --scale worker=1` (or 3) |
 | All runs escalate "verifier agent unavailable" | `docker compose ps verifier` | `docker compose restart verifier` |
 | 429 for one client | `ecs_rate_limited_total` | Expected; raise `RATE_LIMIT_PER_MINUTE` if legitimate |
 | `docker compose up` fails at `.env` | `.env` missing | `cp .env.example .env` |

@@ -98,7 +98,10 @@ class ScreeningRequest(BaseModel):
         ..., ge=0, le=500,
         description="Distance to the nearest protected area boundary. null = unknown (escalates).")
     protected_area_name: Optional[str] = Field(None, min_length=2, max_length=200)
-    interstate_boundary_distance_km: Optional[float] = Field(None, ge=0, le=2000)
+    interstate_boundary_distance_km: Optional[float] = Field(
+        None, ge=0, le=2000,
+        description="Distance to the nearest inter-state or international boundary. Optional: null means the "
+                    "requester reports no such boundary nearby. Only protected_area_distance_km = null means unknown.")
     callback_url: Optional[str] = Field(None, max_length=500, description="Reserved; clients poll.")
 
     @field_validator("project_name", "description")

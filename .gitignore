@@ -11,8 +11,10 @@ __pycache__/
 venv/
 
 # generated output
-eval/results/
-loadtest/results/
+eval/results/*
+!eval/results/.gitkeep
+loadtest/results/*
+!loadtest/results/.gitkeep
 *.log
 
 # corpus PDFs are downloaded per README, not committed (large, public)

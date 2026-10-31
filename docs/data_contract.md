@@ -17,7 +17,7 @@ also served at `GET /v1/contract`. Source of truth: `ecs/contract.py`.
 | `location.district` | string | yes | 2–100 chars |
 | `protected_area_distance_km` | number or null | yes (key must be present) | 0–500; `null` = unknown, which escalates when the category depends on it |
 | `protected_area_name` | string | when a distance is given | 2–200 chars |
-| `interstate_boundary_distance_km` | number or null | no | 0–2000 |
+| `interstate_boundary_distance_km` | number or null | no | 0–2000; `null` = no inter-state or international boundary nearby (not "unknown") |
 
 Unknown fields are rejected (`extra = forbid`).
 
@@ -41,6 +41,11 @@ sector; protected-area name required with a distance.
 `category`, `basis`, `citations[{passage_id, clause_id, document, page, text}]`,
 `conditions_applied`, `escalation_reason`, `verified`, `prompt_version`,
 `disclaimer`.
+
+Console endpoints (read-only unless noted): `GET /v1/console/config`,
+`GET /v1/system/status`, `GET /v1/runs/recent`, `GET /v1/results/eval`,
+`GET /v1/results/loadtest`, and `POST /v1/admin/faults {provider_down: bool}`
+(needs `DEMO_FAULTS=1`, and header `X-Admin-Token` when `ADMIN_TOKEN` is set).
 
 Other interfaces: `POST /v1/screenings/{id}/feedback {satisfactory: bool,
 reason: 3–1000 chars}`; the LLM gateway's `POST /v1/chat`; the verifier's

@@ -100,6 +100,11 @@ services:
     <<: *app
     command: ["uvicorn", "ecs.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
     ports: ["${API_PORT:-8000}:8000"]
+    volumes:
+      # evaluation results are written here by `docker compose exec api python -m eval.run_eval`
+      # and, with Locust results, shown in the web console's Quality tab
+      - ./eval/results:/app/eval/results
+      - ./loadtest/results:/app/loadtest/results:ro
     depends_on:
       redis: {condition: service_healthy}
       ingest: {condition: service_completed_successfully}

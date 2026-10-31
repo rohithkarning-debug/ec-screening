@@ -71,7 +71,9 @@ ts("Step latency p95 by agent and step", [
 advance()
 ts("Retry rate by agent and cause", [('sum by (agent, cause) (rate(ecs_agent_retries_total[5m])) * 60', "{{agent}} {{cause}}")],
    "short", w=8, x=0)
-ts("Escalations by reason (per min)", [('sum by (reason) (rate(ecs_escalations_total[5m])) * 60', "{{reason}}")], "short", w=8, x=8)
+ts("Escalations by reason and reaped runs (per min)", [
+    ('sum by (reason) (rate(ecs_escalations_total[5m])) * 60', "{{reason}}"),
+    ('sum(rate(ecs_runs_reaped_total[5m])) * 60', "reaped (worker died or hung)")], "short", w=8, x=8)
 ts("Container uptime", [('time() - process_start_time_seconds{job=~"api|worker|verifier|llm-gateway"}', "{{job}} {{instance}}")],
    "s", w=8, x=16)
 advance()

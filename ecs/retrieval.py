@@ -101,6 +101,19 @@ def vector_store() -> Chroma:
         return _store
 
 
+def warm_up() -> float:
+    """Load the embedding model now instead of on the first search; returns seconds taken.
+
+    The ONNX model loads lazily on its first call, which on a cold container can take longer than
+    the tool timeout and make the first semantic search of a run fail (see docs/incident_log.md).
+    """
+    import time as _t
+
+    t0 = _t.perf_counter()
+    vector_store().embeddings.embed_query("warm up")
+    return round(_t.perf_counter() - t0, 2)
+
+
 def _passage(doc_id: str, text: str, meta: dict, score: Optional[float] = None) -> dict:
     return {
         "passage_id": doc_id,

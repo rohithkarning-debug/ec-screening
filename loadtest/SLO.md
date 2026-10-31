@@ -30,14 +30,9 @@ growing faster than workers drain it, and that is the signal to scale.
 
 ## How it is measured
 
-```bash
-# gateway pointed at the stub (see README, "Load test")
-docker compose --profile loadtest run --rm locust -f loadtest/locustfile.py --headless \
-  -u 10 -r 2 -t 3m --host http://api:8000 --csv loadtest/results/w1_u10
-docker compose up -d --scale worker=3
-docker compose --profile loadtest run --rm locust -f loadtest/locustfile.py --headless \
-  -u 10 -r 2 -t 3m --host http://api:8000 --csv loadtest/results/w3_u10
-```
+The stub LLM is switched in by the `docker-compose.loadtest.yml` overlay;
+exact commands are in docs/demo_guide.md ("Load test"). Runs: 1 worker and
+3 workers at 10 users, then 3 workers at 20, 40 and 80 users.
 
 Then step users up (10, 20, 40, 80) to find the concurrency at which the
 target fails, and name the component responsible (queue depth, worker CPU,

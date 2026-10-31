@@ -17,6 +17,10 @@ import redis
 from ecs.config import settings
 
 _client: Optional[redis.Redis] = None
+RECENT_KEY = "runs:recent"      # newest first, capped
+ACTIVE_KEY = "runs:active"      # sorted set: run_id -> started_at
+ACTIVE_OWNER_KEY = "runs:active:owner"
+RECENT_MAX = 500
 
 
 def get_redis() -> redis.Redis:
@@ -58,6 +62,9 @@ def create_run(run_id: str, request: dict, client_id: str, prompt_version: str) 
                    "llm_calls": 0, "tool_calls": 0, "steps": 0, "retries": 0},
     }
     save_run(record)
+    r = get_redis()
+    r.lpush(RECENT_KEY, run_id)
+    r.ltrim(RECENT_KEY, 0, RECENT_MAX - 1)
     return record
 
 
@@ -90,3 +97,41 @@ def public_result(record: dict) -> dict:
         "finished_at": record.get("finished_at"),
         **result,
     }
+
+
+def mark_active(run_id: str, worker_id: str) -> None:
+    r = get_redis()
+    r.zadd(ACTIVE_KEY, {run_id: time.time()})
+    r.hset(ACTIVE_OWNER_KEY, run_id, worker_id)
+
+
+def mark_inactive(run_id: str) -> None:
+    r = get_redis()
+    r.zrem(ACTIVE_KEY, run_id)
+    r.hdel(ACTIVE_OWNER_KEY, run_id)
+
+
+def summary(record: dict) -> dict:
+    """One line per run for the console's recent-runs list."""
+    result = record.get("result") or {}
+    req = record.get("request") or {}
+    return {"run_id": record["run_id"], "status": record["status"], "route": result.get("route"),
+            "category": result.get("category"), "verified": result.get("verified"),
+            "cache_hit": bool(result.get("cache_hit")), "sector": req.get("sector"),
+            "project_name": req.get("project_name"),
+            "protected_area_distance_km": req.get("protected_area_distance_km"),
+            "prompt_version": record.get("prompt_version"), "submitted_at": record.get("submitted_at"),
+            "finished_at": record.get("finished_at"),
+            "escalation_reason": result.get("escalation_reason"),
+            "cost_usd": (record.get("totals") or {}).get("cost_usd")}
+
+
+def recent(limit: int = 20) -> list[dict]:
+    out = []
+    for run_id in get_redis().lrange(RECENT_KEY, 0, max(limit, 1) * 2):
+        rec = get_run(run_id)
+        if rec:
+            out.append(summary(rec))
+        if len(out) >= limit:
+            break
+    return out

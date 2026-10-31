@@ -20,8 +20,9 @@ cited; your downloaded text, and the amendments you include, are the authority.
 docker compose exec api python -m eval.run_eval --api http://localhost:8000 --prompt-version v1 --label v1
 docker compose exec api python -m eval.run_eval --api http://localhost:8000 --prompt-version v2 --label v2
 docker compose exec api python -m eval.compare eval/results/v1.json eval/results/v2.json
-docker compose cp api:/app/eval/results ./eval/results
 ```
+
+Results are written to `eval/results/` in the repository folder (it is mounted into the API container) and appear in the web console's Quality tab.
 
 Each scenario goes through the public API, so validation, guardrails, both
 agents and verification are all exercised. The run cache is bypassed by

@@ -6,6 +6,7 @@
 | Prometheus | http://localhost:9090 | Raw metrics; every service scraped, workers found by DNS |
 | Jaeger | http://localhost:16686 | One trace per run across api → worker → tools → gateway → verifier |
 | Run trace API | `GET /v1/screenings/{id}/trace` | The full reconstruction |
+| Web console | http://localhost:8000 → Runs and traces, System | The same trace as a timeline; live service health, breaker, workers |
 
 ## Reconstructing a run from its ID
 
@@ -33,6 +34,7 @@ In Jaeger, search service `worker` with tag `run_id=<id>`. Logs are JSON with
 | Latency per step | `ecs_agent_step_seconds{agent, step}` |
 | Retry rate | `ecs_agent_retries_total{agent, cause}` |
 | Container uptime | `time() - process_start_time_seconds` |
+| Runs reaped after a worker died or hung | `ecs_runs_reaped_total` |
 
 ## Cost (L5)
 

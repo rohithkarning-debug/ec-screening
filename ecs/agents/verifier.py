@@ -11,8 +11,10 @@ resolve_citations: every cited passage ID must be in the run's retrieved set,
     so the citation is checked against the corpus, not against the screener's
     copy.
 rule_checks: deterministic checks that encode what a correct screening must
-    contain - a cited Schedule row, a checked location modifier when the draft
-    says Category B, escalation when a decisive distance is unknown.
+    contain - a cited Schedule row, a capacity on the right side of that row's
+    threshold, a checked location modifier when the draft says Category B,
+    every retrieved amendment to the same item considered, and escalation
+    when a decisive distance is unknown.
 llm_judge: the model reads the cited passages and the draft and says whether
     the passages support it. Skipped when the rules have already failed.
 decide: pass, or fail with issue codes and a different strategy for the
@@ -29,6 +31,7 @@ from typing import Optional, TypedDict
 from langgraph.graph import END, START, StateGraph
 
 from ecs import prompts, retrieval
+from ecs.config import settings
 from ecs.guardrails import ALLOWED_ROUTES, ROUTE_FOR_CATEGORY, wrap_user_text
 from ecs.llm import client as llm
 from ecs.logging_setup import agent_name, log
@@ -48,9 +51,16 @@ STRATEGY = {
                             "project's distances, then apply what you find.",
     "modifier_applies": "A retrieved modifying provision (the General Condition) applies at this distance: "
                         "re-read it, apply it to the Schedule category, and cite both provisions.",
-    "modifier_not_cited": "The draft relies on a modifying provision but does not cite it. Cite it.",
+    "modifier_not_cited": "The draft lists a modifying provision as applied but does not cite it. Cite it, or "
+                          "remove it from conditions_applied if it did not change the category.",
     "no_citations": "Every determination needs citations. Retrieve and cite the Schedule row.",
     "invalid_route": "Use one of the four allowed routes, consistent with the category.",
+    "threshold_mismatch": "The category does not match the cited Schedule row's threshold for this capacity. "
+                          "Re-read the row's Category A and B columns and compare the request's capacity; "
+                          "only a cited modifying provision can move a project above its Schedule category.",
+    "amendment_not_considered": "An amendment to this Schedule item or to the General Condition was retrieved "
+                                "but not considered. Read it: if it changes the rule, apply it and cite it; if it "
+                                "conflicts with the Schedule text and you cannot tell which prevails, escalate.",
     "judge_unsupported": "The cited passages do not support the draft. Search again with a different query "
                          "(search_corpus with type 'amendment' or 'modifier') before answering.",
 }
@@ -118,6 +128,36 @@ def _is_modifier(p: dict) -> bool:
     return p.get("type") == "modifier" or (p.get("clause_id") or "").upper() == "GC"
 
 
+UNIT_PATTERNS = {
+    "MTPA": re.compile(r"(\d+(?:\.\d+)?)\s*(?:mtpa\b|million\s*(?:tonnes?|tons?|t)\b)", re.I),
+    "MW": re.compile(r"(\d+(?:\.\d+)?)\s*mw\b", re.I),
+    "SQM": re.compile(r"(\d[\d,]*(?:\.\d+)?)\s*(?:sq\.?\s*m\b|sqm\b|square\s*met)", re.I),
+    "HA": re.compile(r"(\d+(?:\.\d+)?)\s*(?:ha\b|hectares?\b)", re.I),
+}
+
+
+def _row_threshold(row_text: str, unit: str) -> float | None:
+    """The single threshold a Schedule row states for this unit, or None if absent or ambiguous.
+
+    Conservative on purpose: a row with several thresholds for the unit (e.g. by fuel type) is
+    left to the LLM judge rather than guessed at.
+    """
+    pat = UNIT_PATTERNS.get(unit)
+    if not pat:
+        return None
+    values = {float(m.group(1).replace(",", "")) for m in pat.finditer(row_text)}
+    return values.pop() if len(values) == 1 else None
+
+
+def _measure(req: dict) -> tuple[float, str] | None:
+    cap = req.get("capacity") or {}
+    if cap.get("value") is not None and cap.get("unit") in UNIT_PATTERNS:
+        return float(cap["value"]), cap["unit"]
+    if req.get("area_ha") is not None:
+        return float(req["area_ha"]), "HA"
+    return None
+
+
 @_timed("rule_checks")
 def rule_checks(state: VState) -> VState:
     draft, req, retrieved = state["draft"], state["request"], state["retrieved"]
@@ -138,6 +178,34 @@ def rule_checks(state: VState) -> VState:
     if route in ("category_a_central", "category_b_state") and item:
         if not any((p.get("clause_id") or "").lower() == item or p.get("type") == "schedule_row" for p in cited):
             issues.append(_issue("schedule_row_not_cited", f"Schedule item {item} not cited"))
+
+    # Capacity against the cited row's threshold (A at or above, B below).
+    # A draft relies on the General Condition only if it lists it as applied. Mentioning it in the
+    # basis to say it does NOT apply (e.g. a project already in Category A) is not relying on it.
+    relies_on_modifier = any((c or "").upper() == "GC" for c in draft.get("conditions_applied") or [])
+    row = next((p for p in cited if (p.get("clause_id") or "").lower() == item), None)
+    measure = _measure(req)
+    if row and measure and cat in ("A", "B"):
+        value, unit = measure
+        limit = _row_threshold(row["text"], unit)
+        if limit is not None:
+            if cat == "B" and value >= limit:
+                issues.append(_issue("threshold_mismatch", f"{value:g} {unit} is at or above the row's {limit:g} "
+                                                           f"{unit} threshold, which the row places in Category A"))
+            elif cat == "A" and value < limit and not (relies_on_modifier and any(_is_modifier(p) for p in cited)):
+                issues.append(_issue("threshold_mismatch", f"{value:g} {unit} is below the row's {limit:g} {unit} "
+                                                           "threshold and no modifying provision is cited"))
+
+    # Every retrieved amendment to this item, or to the General Condition, must be considered (F7).
+    cited_ids = {p["passage_id"] for p in cited}
+    loc_matters = any(req.get(k) is not None for k in ("protected_area_distance_km",
+                                                         "interstate_boundary_distance_km"))
+    ignored = [p for p in retrieved.values() if p.get("type") == "amendment" and p["passage_id"] not in cited_ids
+               and (((p.get("clause_id") or "").lower() == item and item)
+                    or (loc_matters and "general condition" in (p.get("text") or "").lower()))]
+    if ignored:
+        issues.append(_issue("amendment_not_considered",
+                             "retrieved but not cited: " + ", ".join(p["passage_id"] for p in ignored[:3])))
 
     distances = {"protected area": req.get("protected_area_distance_km"),
                  "inter-state boundary": req.get("interstate_boundary_distance_km")}
@@ -161,10 +229,8 @@ def rule_checks(state: VState) -> VState:
                                          + ", ".join(f"{v:g} km from the {k}" for k, v in near.items())))
                     break
     if cat == "A":
-        relies = any((c or "").upper() == "GC" for c in draft.get("conditions_applied") or []) or \
-            "general condition" in (draft.get("basis") or "").lower()
-        if relies and not any(_is_modifier(p) for p in cited):
-            issues.append(_issue("modifier_not_cited", "basis relies on the General Condition but does not cite it"))
+        if relies_on_modifier and not any(_is_modifier(p) for p in cited):
+            issues.append(_issue("modifier_not_cited", "the General Condition is listed as applied but not cited"))
     return {"issues": issues}
 
 
@@ -176,7 +242,7 @@ def _route_after_rules(state: VState) -> str:
 
 @_timed("llm_judge")
 def llm_judge(state: VState) -> VState:
-    prompt = prompts.load("verifier", "v1")
+    prompt = prompts.load("verifier", settings.verifier_prompt_version)
     facts = {k: v for k, v in state["request"].items() if k != "description"}
     facts["project_name"] = wrap_user_text(str(facts.get("project_name", "")))
     passages = "\n\n".join(f"[{p['passage_id']}] ({p.get('clause_id') or p.get('type')})\n{p['text'][:1500]}"

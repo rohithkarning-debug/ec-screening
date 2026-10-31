@@ -542,7 +542,7 @@
   },
   {
    "type": "timeseries",
-   "title": "Escalations by reason (per min)",
+   "title": "Escalations by reason and reaped runs (per min)",
    "datasource": {
     "type": "prometheus",
     "uid": "prom"
@@ -571,6 +571,15 @@
      "refId": "A",
      "expr": "sum by (reason) (rate(ecs_escalations_total[5m])) * 60",
      "legendFormat": "{{reason}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prom"
+     }
+    },
+    {
+     "refId": "B",
+     "expr": "sum(rate(ecs_runs_reaped_total[5m])) * 60",
+     "legendFormat": "reaped (worker died or hung)",
      "datasource": {
       "type": "prometheus",
       "uid": "prom"

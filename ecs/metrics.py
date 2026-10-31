@@ -29,6 +29,7 @@ RUN_DURATION = Histogram("ecs_run_duration_seconds", "Run time from submission t
                          buckets=RUN_BUCKETS)
 RUN_CACHE = Counter("ecs_run_cache_total", "Whole-run cache lookups", ["result"])
 RUNS_IN_PROGRESS = Gauge("ecs_runs_in_progress", "Runs currently executing in this worker")
+RUNS_REAPED = Counter("ecs_runs_reaped_total", "Runs left 'running' by a dead or hung worker and escalated")
 
 # --- per agent (A6) -------------------------------------------------------------
 AGENT_TASKS = Counter("ecs_agent_tasks_total", "Agent tasks by outcome", ["agent", "outcome"])

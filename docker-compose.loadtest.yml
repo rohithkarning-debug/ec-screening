@@ -1,0 +1,23 @@
+# Load-test overlay (D6, A7). Use together with docker-compose.yml:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.loadtest.yml up -d
+#
+# While it is active, the LLM gateway talks only to the stub LLM (fixed replies
+# after a realistic delay), so Locust measures this system, not a provider's
+# rate limits, and no real API quota is spent. Keys in .env are not touched.
+# Switch back with a plain `docker compose up -d`.
+services:
+  llm-gateway:
+    environment:
+      LLM_PROVIDER_BASE_URL: http://llm-stub:8090/v1
+      LLM_PROVIDER_API_KEY: ""
+      LLM_MODEL: stub
+      LLM_FALLBACK_BASE_URL: ""
+      LLM_FALLBACK_MODEL: ""
+  llm-stub:
+    environment:
+      STUB_DELAY_MS: "1500"
+  api:
+    environment:
+      RATE_LIMIT_PER_MINUTE: "100000"
+      RUN_CACHE_ENABLED: "0"

@@ -82,6 +82,11 @@ class Settings:
         return _get("LLM_MODEL", required=True)
 
     @property
+    def llm_model_or_none(self) -> str | None:
+        """LLM_MODEL without failing when unset (for display only)."""
+        return _get("LLM_MODEL")
+
+    @property
     def llm_fallback_base_url(self) -> str | None:
         return _get("LLM_FALLBACK_BASE_URL")
 
@@ -105,6 +110,10 @@ class Settings:
     @property
     def prompt_version(self) -> str:
         return _get("PROMPT_VERSION", "v2")
+
+    @property
+    def verifier_prompt_version(self) -> str:
+        return _get("VERIFIER_PROMPT_VERSION", "v2")
 
     @property
     def max_steps(self) -> int:
@@ -179,6 +188,21 @@ class Settings:
     @property
     def metrics_port(self) -> int:
         return _get("METRICS_PORT", 9100, cast=int)
+
+    @property
+    def admin_token(self) -> str | None:
+        """If set, admin actions from the web console need header X-Admin-Token."""
+        return _get("ADMIN_TOKEN")
+
+    @property
+    def stuck_run_seconds(self) -> float:
+        """A run still 'running' after this long is reaped (worker died or hung)."""
+        default = self.max_run_seconds + self.verifier_timeout_s + 60
+        return _get("STUCK_RUN_SECONDS", default, cast=float)
+
+    def public_port(self, name: str, default: int) -> int:
+        """Host ports from .env, used only to build links in the web console."""
+        return _get(name, default, cast=int)
 
 
 settings = Settings()

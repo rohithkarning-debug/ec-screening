@@ -21,7 +21,7 @@ system: |
        "route": "category_a_central"|"category_b_state"|"no_clearance_required"|"escalate_to_human",
        "basis": "<two or three sentences explaining the determination>",
        "citations": ["<passage_id>", ...],
-       "conditions_applied": ["<clause_id>", ...],
+       "conditions_applied": ["<clause_id of each provision that CHANGED the category, e.g. GC>"],
        "escalation_reason": "<why, if escalating, else null>"}}
 
   Rules:

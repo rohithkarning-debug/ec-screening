@@ -84,9 +84,23 @@ curl -s localhost:8000/v1/screenings/<run_id>/trace   # full reconstruction of t
 
 The full contract is in `docs/data_contract.md` and served at `GET /v1/contract`.
 
+## Web console
+
+http://localhost:8000 (or your `API_PORT`) is a console for the whole system:
+
+| Tab | What it is for |
+| --- | --- |
+| Screen a project | Form plus one-click demonstration cases: the section 4.1 case, 15 km, unknown distance, large plant, sector outside the corpus, prompt injection, malformed request, fabricated citation. The verdict shows the citations and a proximity diagram (project distance against the General Condition's ring, read from the retrieved text). |
+| Runs and traces | Recent runs; for each, every step, tool call, passage, verifier verdict, tokens and cost, with a link to the same run in Jaeger. |
+| System | Health of every service, circuit-breaker state, an outage switch (needs `DEMO_FAULTS=1`, and `ADMIN_TOKEN` if set), workers alive and what they are running, index status. |
+| Rejected requests | The quarantine, with field errors. |
+| Quality and load | Evaluation results side by side with the change, Locust results against the p95 target, feedback, live quality. |
+
+Grafana, Jaeger and Prometheus stay the source of truth for metrics and traces; the console links to them.
+
 ## Demo (Evaluation 2)
 
-`scripts/demo.sh` has one command per item:
+Every item can be run from the web console. `scripts/demo.sh` has the same items as terminal commands:
 
 | # | Item | Command |
 | --- | --- | --- |
@@ -109,20 +123,24 @@ docker compose up -d --scale worker=3
 
 ## Load test
 
-The p95 target is declared in `loadtest/SLO.md` before testing. The gateway
-must point at the stub (the default `.env`).
+The p95 target is declared in `loadtest/SLO.md` before testing. Load tests run
+against the stub LLM through the `docker-compose.loadtest.yml` overlay, which
+points the gateway at the stub, lifts the rate limit and turns the run cache
+off, without touching `.env`. The index must contain a corpus (see
+`docs/demo_guide.md`, "Load test").
 
 ```bash
-mkdir -p loadtest/results
-docker compose --profile loadtest run --rm locust -f loadtest/locustfile.py --headless \
-  -u 10 -r 2 -t 3m --host http://api:8000 --csv loadtest/results/w1_u10
-docker compose up -d --scale worker=3
-docker compose --profile loadtest run --rm locust -f loadtest/locustfile.py --headless \
-  -u 10 -r 2 -t 3m --host http://api:8000 --csv loadtest/results/w3_u10
+docker compose -f docker-compose.yml -f docker-compose.loadtest.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.loadtest.yml --profile loadtest run --rm locust \
+  -f loadtest/locustfile.py --headless -u 10 -r 2 -t 2m --host http://api:8000 --csv loadtest/results/w1_u10
+docker compose -f docker-compose.yml -f docker-compose.loadtest.yml up -d --scale worker=3
+docker compose -f docker-compose.yml -f docker-compose.loadtest.yml --profile loadtest run --rm locust \
+  -f loadtest/locustfile.py --headless -u 10 -r 2 -t 2m --host http://api:8000 --csv loadtest/results/w3_u10
+docker compose up -d --scale worker=1      # back to the real model
 ```
 
-Read the `full_run` row (submission to final result) and fill in `loadtest/RESULTS.md`.
-For load tests, set `RATE_LIMIT_PER_MINUTE` high in `.env`.
+Results appear in the console's Quality tab; read the `full_run` row
+(submission to final result) and fill in `loadtest/RESULTS.md`.
 
 ## Evaluation
 

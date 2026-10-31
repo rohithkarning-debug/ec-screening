@@ -62,10 +62,17 @@ one escalates the run with the reason.
 | `modifier_not_checked` | Draft says B, no modifier retrieved | Fetch GC, search modifiers |
 | `modifier_applies` | Draft says B, a retrieved modifier's km limit covers a request distance | Apply the GC, cite both |
 | `modifier_not_cited` | Basis relies on the GC without citing it | Cite it |
+| `threshold_mismatch` | The request's capacity (or area) is on the wrong side of the single threshold stated in the cited Schedule row, with no cited modifier to explain an A | Re-read the row's A and B columns |
+| `amendment_not_considered` | An amendment to the same Schedule item, or one that mentions the General Condition when location matters, was retrieved but not cited | Apply and cite it, or escalate if it conflicts (F7) |
 | `proximity_unknown` | Draft says B but the protected-area distance is unknown | **Escalate** |
 | `judge_unsupported` | The LLM judge finds the passages do not support the draft | Search amendments and modifiers |
 
 Escalations always pass verification: not answering is always permitted.
+
+The threshold rule is deliberately conservative: it acts only when the cited
+row states exactly one threshold for the request's unit (e.g. cement, 1.0
+MTPA). Rows with several thresholds, such as thermal power by fuel type, are
+left to the LLM judge rather than guessed at.
 
 ## Failure modes
 
@@ -75,7 +82,7 @@ Escalations always pass verification: not answering is always permitted.
 | Provider down | Breaker opens after `BREAKER_FAIL_THRESHOLD` failures; fallback provider if configured; else 503, run escalates "provider unavailable" |
 | Verifier down / timeout | Two attempts, then the run escalates "verifier unavailable"; nothing unverified is returned |
 | Model returns invalid JSON | One corrective retry, then escalation |
-| Worker crashes mid-run | The record stays `running` with its partial trace; see runbook |
+| Worker crashes or hangs mid-run | Workers send a heartbeat every 5 s and register each run in `runs:active`. Every 30 s one worker (Redis lock) reaps runs active longer than `STUCK_RUN_SECONDS`: the run is closed as `failed` with an escalation, its partial trace kept. A worker that finishes after its run was reaped does not overwrite the escalation. |
 | Any exception in the graph | Run marked `failed`, result is an escalation |
 
 ## Guardrails (L4)

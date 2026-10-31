@@ -195,6 +195,7 @@
         }
       ],
       "default": null,
+      "description": "Distance to the nearest inter-state or international boundary. Optional: null means the requester reports no such boundary nearby. Only protected_area_distance_km = null means unknown.",
       "title": "Interstate Boundary Distance Km"
     },
     "callback_url": {

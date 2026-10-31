@@ -2,8 +2,8 @@
 
 Two layers, both in Redis so every worker replica shares them:
 
-1. Whole-run cache. Key = hash(normalised request + prompt version + index
-   fingerprint). Screening the same project twice against the same corpus and
+1. Whole-run cache. Key = hash(normalised request + content hashes of the
+   screener and verifier prompts + index fingerprint). Screening the same project twice against the same corpus and
    prompt should give the same opinion, so a hit returns the stored, verified
    result without any model call. Only verified results are cached; an
    escalation caused by a provider outage is never cached. The index

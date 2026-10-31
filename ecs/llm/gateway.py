@@ -182,7 +182,8 @@ async def chat(req: ChatRequest, request: Request):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "breakers": {k: b.snapshot() for k, b in breakers.items()} or {"primary": "closed"}}
+    return {"status": "ok", "breakers": {k: b.snapshot() for k, b in breakers.items()} or {"primary": "closed"},
+            "faults": dict(FAULTS)}
 
 
 @app.get("/metrics")

@@ -262,6 +262,11 @@ def _citations(state: RunState, ids: list) -> list:
 
 def finalize(state: RunState) -> RunState:
     answer, notes = guardrails.filter_output(state["draft"])
+    if answer["route"] == "escalate_to_human":
+        # the agent chose not to answer: show what it consulted, claim no conditions
+        if not answer.get("citations"):
+            answer["citations"] = list(state.get("retrieved", {}).keys())[:6]
+        answer["conditions_applied"] = []
     result = {
         "route": answer["route"], "category": answer.get("category"), "basis": answer.get("basis"),
         "citations": _citations(state, [c for c in answer.get("citations") or [] if isinstance(c, str)]),

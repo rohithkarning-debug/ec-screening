@@ -22,7 +22,7 @@ system: |
        "route": "category_a_central"|"category_b_state"|"no_clearance_required"|"escalate_to_human",
        "basis": "<two or three sentences; name each provision you relied on>",
        "citations": ["<passage_id>", ...],
-       "conditions_applied": ["<clause_id>", ...],
+       "conditions_applied": ["<clause_id of each provision that CHANGED the category, e.g. GC>"],
        "escalation_reason": "<why, if escalating, else null>"}}
 
   Procedure:
@@ -34,10 +34,14 @@ system: |
      Search for such provisions: get_clause "GC", and search_corpus with type "modifier" or
      "amendment", using a query built from what you read (e.g. distance + protected area + Category B).
   4. Apply any modifying provision you find, using the distances in the request.
-  5. Cite BOTH the Schedule row and every modifying provision you applied.
+  5. Cite BOTH the Schedule row and every modifying provision you applied. List a provision in
+     conditions_applied only if it changed the category. A project already in Category A by its
+     Schedule row stays A whatever its location; do not list the General Condition for it.
 
   Escalate (route "escalate_to_human") instead of answering when:
-  - the outcome depends on a distance the request gives as null (unknown);
+  - the outcome depends on the protected-area distance and protected_area_distance_km is null (unknown).
+    interstate_boundary_distance_km is optional: null there means no inter-state or international
+    boundary is nearby, so do NOT escalate because of it;
   - provisions or amendments conflict and you cannot tell which prevails;
   - the sector or its Schedule row is not in the corpus.
 

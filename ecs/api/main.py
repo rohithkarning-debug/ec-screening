@@ -9,6 +9,8 @@ queue sits between submission and execution.
 
 Order of checks at the boundary, cheapest first, and none of them start a run:
 rate limit -> JSON parse -> data contract -> input guardrails -> run cache.
+Header `X-Cache-Bypass: 1` skips the run cache (used for demonstrations that
+must reach the model, such as the circuit-breaker test).
 """
 from __future__ import annotations
 
@@ -26,7 +28,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import ValidationError
 
 from ecs import cache, guardrails, live_quality, prompts, retrieval, runstore
-from ecs.api import feedback, quarantine, ratelimit
+from ecs.api import console, feedback, quarantine, ratelimit
 from ecs.config import settings
 from ecs.contract import CONTRACT_VERSION, ScreeningRequest, field_errors
 from ecs.cost import summarize_run_costs
@@ -58,6 +60,7 @@ app = FastAPI(title="Environmental Clearance Pre-Screening Service", version="1.
               description="Screening opinion only. Not an authoritative determination; an accredited "
                           "consultant decides.")
 app.include_router(feedback.router)
+app.include_router(console.router)
 
 
 @app.middleware("http")
@@ -116,12 +119,16 @@ async def submit(request: Request, client_id: str = Depends(ratelimit.enforce)):
         run_id = runstore.new_run_id()
         correlation_id.set(run_id)
         s.set_attribute("run_id", run_id)
-        key = cache.run_cache_key(normalized, pv, retrieval.index_version(r))
-        cached = cache.get_run(r, key)
+        # key on the prompts' content hashes, so editing a prompt invalidates cached answers
+        prompt_key = f"{prompts.load('screener', pv).tag}|{prompts.load('verifier', settings.verifier_prompt_version).tag}"
+        key = cache.run_cache_key(normalized, prompt_key, retrieval.index_version(r))
+        skip_cache = request.headers.get("X-Cache-Bypass", "").lower() in ("1", "true", "yes")
+        cached = None if skip_cache else cache.get_run(r, key)
         record = runstore.create_run(run_id, normalized, client_id, pv)
         if cached:
             record.update(status="done", started_at=time.time(), finished_at=time.time(),
-                          result={**cached, "cache_hit": True}, cached_from=key)
+                          result={**cached, "cache_hit": True}, cached_from=key,
+                          cached_from_run=cached.get("source_run_id"))
             runstore.save_run(record)
             RUNS.labels(cached.get("route") or "none", "done").inc()
             SUBMISSIONS.labels("cache_hit").inc()
